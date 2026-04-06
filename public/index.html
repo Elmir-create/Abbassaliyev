@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Туристическое агентство</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f0f8ff;
+        }
+        .calculator {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        select, input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+    <div class="calculator">
+        <h2>Калькулятор стоимости тура</h2>
+        <form id="calcForm">
+            <div class="form-group">
+                <label for="country">Страна:</label>
+                <select id="country" required>
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="days">Количество дней:</label>
+                <input type="number" id="days" value="7" min="1" step="1" required>
+            </div>
+            <div class="form-group">
+                <label for="persons">Количество человек:</label>
+                <input type="number" id="persons" value="2" min="1" step="1" required>
+            </div>
+            <div class="form-group">
+                <label for="accommodation">Тип проживания:</label>
+                <select id="accommodation" required>
+                    <option value="">Загрузка...</option>
+                </select>
+            </div>
+            <button type="submit">Рассчитать стоимость</button>
+        </form>
+        <div id="result"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3000/api';
+
+        async function loadCountries() {
+            try {
+                const res = await fetch(`${API_BASE}/countries`);
+                const data = await res.json();
+                if (data.success) {
+                    const select = document.getElementById('country');
+                    select.innerHTML = '<option value="">-- Выберите страну --</option>';
+                    data.countries.forEach(c => {
+                        const option = document.createElement('option');
+                        option.value = c.id;
+                        option.textContent = `${c.name} (${c.price_per_day} руб/день)`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('country').innerHTML = '<option>Ошибка загрузки</option>';
+            }
+        }
+
+        async function loadAccommodation() {
+            try {
+                const res = await fetch(`${API_BASE}/accommodation`);
+                const data = await res.json();
+                if (data.success) {
+                    const select = document.getElementById('accommodation');
+                    select.innerHTML = '';
+                    data.accommodation.forEach(a => {
+                        const option = document.createElement('option');
+                        option.value = a.id;
+                        option.textContent = a.type;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+                document.getElementById('accommodation').innerHTML = '<option>Ошибка загрузки</option>';
+            }
+        }
+
+        document.getElementById('calcForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const countryId = document.getElementById('country').value;
+            const days = document.getElementById('days').value;
+            const persons = document.getElementById('persons').value;
+            const accommodationId = document.getElementById('accommodation').value;
+
+            if (!countryId || !accommodationId) {
+                alert('Выберите страну и тип проживания');
+                return;
+            }
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'loading';
+            resultDiv.innerHTML = 'Расчёт...';
+
+            try {
+                const res = await fetch(`${API_BASE}/calculate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        country_id: parseInt(countryId),
+                        days: parseInt(days),
+                        persons: parseInt(persons),
+                        accommodation_id: parseInt(accommodationId)
+                    })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = `<strong>Итоговая стоимость:</strong> ${data.total.toFixed(2)} руб.<br>${data.calculation}`;
+                } else {
+                    resultDiv.className = 'error';
+                    resultDiv.innerHTML = `Ошибка: ${data.error}`;
+                }
+            } catch (err) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `Ошибка соединения: ${err.message}`;
+            }
+        });
+
+        loadCountries();
+        loadAccommodation();
+    </script>
+</body>
+</html>
